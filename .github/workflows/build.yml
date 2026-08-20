@@ -24,7 +24,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Set up GraalVM CE 21
         # NOT actions/setup-java: it has no graalvm-community distribution and fails with
@@ -54,7 +54,7 @@ jobs:
   contract:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           # buf breaking resolves the base branch from the local clone, which a shallow
           # checkout does not contain.
