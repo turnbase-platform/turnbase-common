@@ -1,0 +1,15 @@
+# buf lint and buf breaking run against the committed proto copy.
+#
+# No PACKAGE_DIRECTORY_MATCH exception here, unlike the spec tree's buf.yaml: the copy
+# sits at turnbase/gamehost/v1/gamehost.proto, which is what the proto package
+# turnbase.gamehost.v1 requires. The waiver stays scoped to the spec directory, where the
+# file is flat for readability beside its design doc (conventions.md §5).
+version: v2
+modules:
+  - path: src/main/proto
+lint:
+  use:
+    - STANDARD
+breaking:
+  use:
+    - FILE

@@ -1,0 +1,513 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>io.turnbase</groupId>
+  <artifactId>turnbase-grpc</artifactId>
+  <!--
+    SNAPSHOT here is the development version of THIS artifact, which is not what
+    conventions.md §5 forbids. That rule is about SNAPSHOT *dependencies* in a consumer's
+    pom; §5's own local-loop example installs 0.2.0-SNAPSHOT from here and overrides the
+    consumer's property on the command line, so this side has to be a SNAPSHOT for that to
+    work. Releases are tag-triggered and CI sets the version from the tag (ADR-0012,
+    Release Strategy).
+  -->
+  <version>0.1.0-SNAPSHOT</version>
+  <packaging>jar</packaging>
+
+  <name>turnbase-grpc</name>
+  <description>Internal shared library: generated gRPC stubs for the Orchestration Service to Game Host
+    contract, plus internal models. Not a public contract — that is turnbase-sdk.</description>
+
+  <!--
+    Every version below is exact. conventions.md §6 requires reproducible builds, and a
+    range or a property inherited from elsewhere is how the same commit compiles
+    differently on Tuesday.
+
+    Note this project has no parent POM. The five repositories are independently
+    versioned and deployed (ADR-0012); a shared parent would be a sixth artifact with a
+    release lifecycle, coupling all five to it for the sake of deduplicating plugin
+    configuration that is deliberately identical anyway.
+  -->
+  <properties>
+    <maven.compiler.release>21</maven.compiler.release>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+
+    <!-- Dependencies -->
+    <grpc.version>1.83.1</grpc.version>
+    <protobuf.version>4.36.0</protobuf.version>
+    <jspecify.version>1.0.1</jspecify.version>
+    <tomcat-annotations.version>6.0.53</tomcat-annotations.version>
+    <junit.version>6.1.3</junit.version>
+    <assertj.version>3.27.7</assertj.version>
+
+    <!-- Plugins -->
+    <protobuf-maven-plugin.version>4.1.3</protobuf-maven-plugin.version>
+    <spotless.version>3.10.0</spotless.version>
+    <google-java-format.version>1.36.1</google-java-format.version>
+    <error-prone.version>2.50.0</error-prone.version>
+    <nullaway.version>0.13.8</nullaway.version>
+    <jacoco.version>0.8.15</jacoco.version>
+    <maven-compiler-plugin.version>3.15.0</maven-compiler-plugin.version>
+    <maven-surefire-plugin.version>3.5.6</maven-surefire-plugin.version>
+    <maven-failsafe-plugin.version>3.5.6</maven-failsafe-plugin.version>
+    <maven-enforcer-plugin.version>3.6.3</maven-enforcer-plugin.version>
+    <maven-source-plugin.version>3.4.0</maven-source-plugin.version>
+    <maven-javadoc-plugin.version>3.12.0</maven-javadoc-plugin.version>
+
+    <!--
+      Coverage floor. platform-operations.md FR-CICD-003 sets 70% across unit and
+      integration together. This repository is almost entirely generated code, which is
+      excluded below, so the ratio is measured over the hand-written remainder.
+
+      KNOWN AND DELIBERATE: that remainder is currently empty, so the check passes
+      vacuously and logs "All coverage checks have been met" over a bundle of zero
+      classes. That is a true statement about this repository — it publishes a codegen
+      artifact and has no hand-written production code yet — but it is the same shape as
+      the fail-open trap conventions.md §3 warns about, so it is written down rather than
+      left for someone to discover.
+
+      It stops being vacuous by itself: the first class under io.turnbase.grpc.internal
+      enters the bundle and is held to 70% with no build change. Do not "fix" it by
+      lowering the threshold or by including the generated stubs, which would set the
+      gate to whatever codegen happens to produce.
+    -->
+    <jacoco.line.coverage>0.70</jacoco.line.coverage>
+  </properties>
+
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>io.grpc</groupId>
+        <artifactId>grpc-bom</artifactId>
+        <version>${grpc.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>com.google.protobuf</groupId>
+        <artifactId>protobuf-bom</artifactId>
+        <version>${protobuf.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.junit</groupId>
+        <artifactId>junit-bom</artifactId>
+        <version>${junit.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
+  <dependencies>
+    <!--
+      Compile-scope and transitive on purpose: both consumers need these to use the
+      stubs at all, so making them provided would push the same three declarations into
+      turnbase-platform and turnbase-game-host with nothing gained.
+    -->
+    <dependency>
+      <groupId>io.grpc</groupId>
+      <artifactId>grpc-protobuf</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.grpc</groupId>
+      <artifactId>grpc-stub</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.google.protobuf</groupId>
+      <artifactId>protobuf-java</artifactId>
+    </dependency>
+
+    <!--
+      The transport is NOT declared here. A library that pins grpc-netty-shaded forces
+      it on every consumer, and turnbase-platform runs inside Spring Boot, which may
+      want to manage the Netty version itself. Consumers pick their own transport.
+    -->
+
+    <!--
+      protoc-gen-grpc-java emits @javax.annotation.Generated, which is not on the JDK 21
+      class path. Without this the generated sources fail to compile with a "package
+      javax.annotation does not exist" error that looks like a broken proto rather than a
+      missing dependency. Provided scope: needed to compile, never at run time.
+    -->
+    <dependency>
+      <groupId>org.apache.tomcat</groupId>
+      <artifactId>annotations-api</artifactId>
+      <version>${tomcat-annotations.version}</version>
+      <scope>provided</scope>
+    </dependency>
+
+    <!-- JSpecify @NullMarked is read by NullAway here and by consumers' NullAway runs. -->
+    <dependency>
+      <groupId>org.jspecify</groupId>
+      <artifactId>jspecify</artifactId>
+      <version>${jspecify.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.assertj</groupId>
+      <artifactId>assertj-core</artifactId>
+      <version>${assertj.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.grpc</groupId>
+      <artifactId>grpc-inprocess</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.grpc</groupId>
+      <artifactId>grpc-testing</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <!--
+        Fail early and legibly on a wrong JDK or Maven. Without this, a JDK 17 build
+        fails somewhere inside protoc codegen with a message about class file versions.
+      -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-enforcer-plugin</artifactId>
+        <version>${maven-enforcer-plugin.version}</version>
+        <executions>
+          <execution>
+            <id>enforce-toolchain</id>
+            <goals>
+              <goal>enforce</goal>
+            </goals>
+            <phase>validate</phase>
+            <configuration>
+              <rules>
+                <requireJavaVersion>
+                  <version>[21,22)</version>
+                </requireJavaVersion>
+                <requireMavenVersion>
+                  <version>[3.9,)</version>
+                </requireMavenVersion>
+                <!-- conventions.md §5: no SNAPSHOT dependency ever reaches a release. -->
+                <requireReleaseDeps>
+                  <onlyWhenRelease>true</onlyWhenRelease>
+                </requireReleaseDeps>
+              </rules>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+
+      <!--
+        Spotless at validate, per conventions.md §2: seconds to fail, before compilation
+        rather than after the test suite. The fix is ./mvnw spotless:apply.
+
+        Generated sources are not in <includes> — target/generated-sources is outside
+        src/main/java, so nothing formats them.
+      -->
+      <plugin>
+        <groupId>com.diffplug.spotless</groupId>
+        <artifactId>spotless-maven-plugin</artifactId>
+        <version>${spotless.version}</version>
+        <configuration>
+          <java>
+            <includes>
+              <include>src/main/java/**/*.java</include>
+              <include>src/test/java/**/*.java</include>
+            </includes>
+            <googleJavaFormat>
+              <version>${google-java-format.version}</version>
+            </googleJavaFormat>
+            <removeUnusedImports/>
+            <importOrder/>
+            <trimTrailingWhitespace/>
+            <endWithNewline/>
+          </java>
+          <pom>
+            <sortPom>
+              <expandEmptyElements>false</expandEmptyElements>
+            </sortPom>
+          </pom>
+        </configuration>
+        <executions>
+          <execution>
+            <id>spotless-check</id>
+            <goals>
+              <goal>check</goal>
+            </goals>
+            <phase>validate</phase>
+          </execution>
+        </executions>
+      </plugin>
+
+      <!--
+        protoc runs against src/main/proto, which holds the COMMITTED copy of the
+        authoritative gamehost.proto (ADR-0012 as amended, conventions.md §5). Nothing
+        here reads a path outside this repository — that is what lets a standalone clone
+        build, and CI clones this repo alone.
+
+        Refresh the copy from the parent with scripts/sync-proto.sh; editing it here is
+        a defect.
+      -->
+      <plugin>
+        <groupId>io.github.ascopes</groupId>
+        <artifactId>protobuf-maven-plugin</artifactId>
+        <version>${protobuf-maven-plugin.version}</version>
+        <configuration>
+          <protocVersion>${protobuf.version}</protocVersion>
+          <binaryMavenPlugins>
+            <binaryMavenPlugin>
+              <groupId>io.grpc</groupId>
+              <artifactId>protoc-gen-grpc-java</artifactId>
+              <version>${grpc.version}</version>
+            </binaryMavenPlugin>
+          </binaryMavenPlugins>
+        </configuration>
+        <executions>
+          <execution>
+            <id>generate-proto</id>
+            <goals>
+              <goal>generate</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+
+      <!--
+        Error Prone + NullAway (ADR-0015).
+
+        NullAway is scoped to io.turnbase.grpc.internal — hand-written code only. The
+        generated stubs under io.turnbase.grpc.gamehost.v1 are excluded because they
+        will never carry @NullMarked, and noise on code nobody wrote is the fastest
+        route to somebody muting the tool in all five repositories (this repo's
+        CLAUDE.md).
+
+        The two compilerArgs below (compilePolicy and should-stop) are required by Error
+        Prone itself; without them the build fails in a way that reads as a broken
+        toolchain. The add-exports flags live in .mvn/jvm.config, because they must
+        reach the JVM that forks javac.
+      -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>${maven-compiler-plugin.version}</version>
+        <configuration>
+          <compilerArgs>
+            <arg>-XDcompilePolicy=simple</arg>
+            <arg>--should-stop=ifError=FLOW</arg>
+            <!-- Required by Error Prone on JDK 21; it refuses to start without it. -->
+            <arg>-XDaddTypeAnnotationsToSymbol=true</arg>
+            <arg>-Xplugin:ErrorProne
+              -XepExcludedPaths:.*/generated-sources/.*
+              -Xep:NullAway:ERROR
+              -XepOpt:NullAway:AnnotatedPackages=io.turnbase.grpc.internal</arg>
+          </compilerArgs>
+          <annotationProcessorPaths>
+            <path>
+              <groupId>com.google.errorprone</groupId>
+              <artifactId>error_prone_core</artifactId>
+              <version>${error-prone.version}</version>
+            </path>
+            <path>
+              <groupId>com.uber.nullaway</groupId>
+              <artifactId>nullaway</artifactId>
+              <version>${nullaway.version}</version>
+            </path>
+          </annotationProcessorPaths>
+        </configuration>
+      </plugin>
+
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <version>${maven-surefire-plugin.version}</version>
+        <configuration>
+          <includes>
+            <include>**/*Test.java</include>
+          </includes>
+        </configuration>
+      </plugin>
+
+      <!--
+        JaCoCo. conventions.md §3: unit and integration exec files are merged before a
+        single check, because wiring one execution bound to test silently measures unit
+        tests only and fails open.
+
+        This repository has no integration tier today — there is no database, no broker,
+        nothing to containerise; the stubs are exercised in-process. The merge is wired
+        anyway so the -Pintegration profile has somewhere to write, and so this pom does
+        not differ in shape from the other three Java repositories.
+      -->
+      <plugin>
+        <groupId>org.jacoco</groupId>
+        <artifactId>jacoco-maven-plugin</artifactId>
+        <version>${jacoco.version}</version>
+        <configuration>
+          <excludes>
+            <!-- Generated stubs: not our code, and 100% of the bytecode. -->
+            <exclude>io/turnbase/grpc/gamehost/v1/**</exclude>
+          </excludes>
+        </configuration>
+        <executions>
+          <execution>
+            <id>prepare-unit</id>
+            <goals>
+              <goal>prepare-agent</goal>
+            </goals>
+            <configuration>
+              <destFile>${project.build.directory}/jacoco/unit.exec</destFile>
+            </configuration>
+          </execution>
+          <execution>
+            <id>merge-exec</id>
+            <goals>
+              <goal>merge</goal>
+            </goals>
+            <phase>verify</phase>
+            <configuration>
+              <fileSets>
+                <fileSet>
+                  <directory>${project.build.directory}/jacoco</directory>
+                  <includes>
+                    <include>*.exec</include>
+                  </includes>
+                </fileSet>
+              </fileSets>
+              <destFile>${project.build.directory}/jacoco/merged.exec</destFile>
+            </configuration>
+          </execution>
+          <execution>
+            <id>report-merged</id>
+            <goals>
+              <goal>report</goal>
+            </goals>
+            <phase>verify</phase>
+            <configuration>
+              <dataFile>${project.build.directory}/jacoco/merged.exec</dataFile>
+              <outputDirectory>${project.build.directory}/site/jacoco</outputDirectory>
+            </configuration>
+          </execution>
+          <execution>
+            <id>check-merged</id>
+            <goals>
+              <goal>check</goal>
+            </goals>
+            <phase>verify</phase>
+            <configuration>
+              <dataFile>${project.build.directory}/jacoco/merged.exec</dataFile>
+              <rules>
+                <rule>
+                  <element>BUNDLE</element>
+                  <limits>
+                    <limit>
+                      <counter>LINE</counter>
+                      <value>COVEREDRATIO</value>
+                      <minimum>${jacoco.line.coverage}</minimum>
+                    </limit>
+                  </limits>
+                </rule>
+              </rules>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+
+      <!-- Sources and Javadoc are published alongside the jar: consumers read the -->
+      <!-- protocol semantics from the proto comments through their IDE.            -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-source-plugin</artifactId>
+        <version>${maven-source-plugin.version}</version>
+        <executions>
+          <execution>
+            <id>attach-sources</id>
+            <goals>
+              <goal>jar-no-fork</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+
+  <profiles>
+    <!--
+      conventions.md §3: *IT runs under failsafe, only with -Pintegration. Empty of
+      tests today; present so the invocation is identical across the Java repositories
+      and so the exec file lands where the merge above expects it.
+    -->
+    <profile>
+      <id>integration</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.jacoco</groupId>
+            <artifactId>jacoco-maven-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>prepare-integration</id>
+                <goals>
+                  <goal>prepare-agent</goal>
+                </goals>
+                <phase>pre-integration-test</phase>
+                <configuration>
+                  <destFile>${project.build.directory}/jacoco/integration.exec</destFile>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-failsafe-plugin</artifactId>
+            <version>${maven-failsafe-plugin.version}</version>
+            <configuration>
+              <includes>
+                <include>**/*IT.java</include>
+              </includes>
+            </configuration>
+            <executions>
+              <execution>
+                <goals>
+                  <goal>integration-test</goal>
+                  <goal>verify</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+
+    <!-- Javadoc jar only on release: it is slow and adds nothing to the inner loop. -->
+    <profile>
+      <id>release</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-javadoc-plugin</artifactId>
+            <version>${maven-javadoc-plugin.version}</version>
+            <configuration>
+              <doclint>none</doclint>
+            </configuration>
+            <executions>
+              <execution>
+                <id>attach-javadocs</id>
+                <goals>
+                  <goal>jar</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
+</project>

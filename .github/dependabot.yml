@@ -1,0 +1,43 @@
+# Supply-chain updates, per conventions.md §6 and platform-operations.md FR-CICD-010.
+#
+# Trivy scanning is wired by IMP-M0-11 with the rest of the shared pipeline; this file is
+# the half that is pure configuration and therefore cheaper to land now than to remember
+# later.
+version: 2
+updates:
+  - package-ecosystem: maven
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      # grpc and protobuf move together and their versions are coupled — protoc, the
+      # runtime and the codegen plugin must agree. Separate PRs for each would mean
+      # merging a combination nobody built.
+      grpc-protobuf:
+        patterns:
+          - io.grpc:*
+          - com.google.protobuf:*
+      build-tooling:
+        patterns:
+          - com.diffplug.spotless:*
+          - com.google.errorprone:*
+          - com.uber.nullaway:*
+          - org.jacoco:*
+          - org.apache.maven.plugins:*
+          - io.github.ascopes:*
+      test:
+        patterns:
+          - org.junit*
+          - org.assertj:*
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: chore
+      include: scope
