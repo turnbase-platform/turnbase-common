@@ -40,6 +40,12 @@ Generated code lands under `io.turnbase.grpc`.
 ./mvnw verify        # buf lint + buf breaking run in CI
 ```
 
+**Almost everything here is generated**, so Error Prone and NullAway are scoped to hand-written code
+only ([ADR-0015](../docs/decisions/0015-static-analysis-error-prone-nullaway.md)). Noise on generated
+stubs is the fastest route to somebody muting the tool in all five repositories.
+
+`git config core.hooksPath .githooks` once, to get the `pre-push` fast-fail.
+
 **`buf breaking` is the real gate here.** Both consumers are pinned to an exact version of this
 artifact (`conventions.md` §5), so a breaking change does not surface until someone bumps the
 property in their own repo. That is the right place for it to surface — but only if `buf breaking`
