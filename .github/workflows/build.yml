@@ -24,20 +24,19 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-        with:
-          # buf breaking compares against the master ref, which a shallow clone lacks.
-          # Without this the job fails with "no .proto files" and reads as a buf bug.
-          fetch-depth: 0
+      - uses: actions/checkout@v5
 
-      - name: Set up Java 21
-        uses: actions/setup-java@v4
+      - name: Set up GraalVM CE 21
+        # NOT actions/setup-java: it has no graalvm-community distribution and fails with
+        # "No supported distribution was found for input graalvm-community". GraalVM CE is
+        # set up by GraalVM's own action, and the toolchain is pinned to 21.0.2-graalce in
+        # .sdkmanrc, so CI and a developer's shell run the same JDK.
+        uses: graalvm/setup-graalvm@v1
         with:
-          # GraalVM CE 21 is the runtime the services use; the toolchain is pinned to
-          # 21.0.2-graalce in .sdkmanrc and this is its CI equivalent.
           distribution: graalvm-community
           java-version: '21'
           cache: maven
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Verify
         # Spotless runs at validate, Error Prone and NullAway during compile, JaCoCo's
@@ -46,7 +45,7 @@ jobs:
 
       - name: Coverage report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: jacoco
           path: target/site/jacoco/
@@ -55,20 +54,30 @@ jobs:
   contract:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
+          # buf breaking resolves the base branch from the local clone, which a shallow
+          # checkout does not contain.
           fetch-depth: 0
 
       - uses: bufbuild/buf-action@v1
         with:
-          # The action runs lint and breaking itself; breaking compares a pull request
-          # against its base. A separate job from the Maven build because a contract
-          # break is a different failure with a different fix, and reading which one
-          # broke off a single job's log is needless work.
+          # A separate job from the Maven build because a contract break is a different
+          # failure with a different fix, and picking which one broke out of a single
+          # job's log is needless work.
           setup_only: false
           lint: true
           format: false
-          breaking: true
-          breaking_against: ${{ github.event_name == 'pull_request' && format('https://github.com/{0}.git#branch={1}', github.repository, github.base_ref) || format('https://github.com/{0}.git#branch=master,ref=HEAD~1', github.repository) }}
+
+          # breaking runs on pull requests only, against the PR's base branch.
+          #
+          # On a push it has nothing meaningful to compare against: HEAD~1 is the commit
+          # this one replaced, so the check either duplicates the PR run or, on the commit
+          # that first introduces the proto, compares against a tree with no .proto files
+          # at all and fails with `Module "path: "."" had no .proto files` — which reads
+          # as a broken config rather than as "there is no baseline yet". That is exactly
+          # how this job failed on its first run.
+          breaking: ${{ github.event_name == 'pull_request' }}
+          breaking_against: https://github.com/${{ github.repository }}.git#branch=${{ github.base_ref }}
           push: false
           archive: false

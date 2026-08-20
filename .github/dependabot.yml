@@ -13,6 +13,14 @@ updates:
     commit-message:
       prefix: chore
       include: scope
+    ignore:
+      # protobuf-maven-plugin 5.x rewrote its configuration surface: protocVersion and
+      # binaryMavenPlugins became protoc and plugins, with different types, so a version
+      # bump alone fails with a null-pointer inside mojo configuration parsing. 4.1.3 is
+      # a deliberate pin, not a stale one. Moving to 5.x is a config rewrite and belongs
+      # in a change that someone intends, so Dependabot is told to stop proposing it.
+      - dependency-name: io.github.ascopes:protobuf-maven-plugin
+        versions: ['>=5.0.0']
     groups:
       # grpc and protobuf move together and their versions are coupled — protoc, the
       # runtime and the codegen plugin must agree. Separate PRs for each would mean
