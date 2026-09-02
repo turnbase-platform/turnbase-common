@@ -15,12 +15,13 @@ Internal shared library: generated gRPC stubs and internal models. Publishes
 ## The proto here is a copy
 
 **`gamehost.proto` is authoritative in the parent repository**, at
-`docs/specs/internal-grpc/gamehost.proto`. This repo copies it into `src/main/proto/` at build time
-(ADR-0012).
+`docs/specs/internal-grpc/gamehost.proto`. This repo holds a **committed copy** at
+`src/main/proto/turnbase/gamehost/v1/gamehost.proto` (ADR-0012 as amended by IMP-GATE-02) — nothing
+in this repo's build may read a path outside it, since CI checks out this repo alone.
 
 **Editing the copy is a defect.** The change belongs in the parent repo's spec directory, and the
-copy is refreshed from it. A divergence here is invisible — both sides compile, and the two services
-disagree on the wire.
+copy is refreshed from it with `scripts/sync-proto.sh` (run from the parent). A divergence here is
+invisible — both sides compile, and the two services disagree on the wire.
 
 Where `orchestration-gamehost-protocol.md`'s prose disagrees with the proto, **the proto wins for
 wire shape** — but raise the disagreement rather than silently following one.
