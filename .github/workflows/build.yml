@@ -69,15 +69,22 @@ jobs:
           lint: true
           format: false
 
-          # breaking runs on pull requests only, against the PR's base branch.
+          # breaking runs on every push to master, against the commit the push replaced,
+          # and on a pull request against its base branch — the PR path is kept working
+          # for whenever PRs come back.
           #
-          # On a push it has nothing meaningful to compare against: HEAD~1 is the commit
-          # this one replaced, so the check either duplicates the PR run or, on the commit
-          # that first introduces the proto, compares against a tree with no .proto files
-          # at all and fails with `Module "path: "."" had no .proto files` — which reads
-          # as a broken config rather than as "there is no baseline yet". That is exactly
-          # how this job failed on its first run.
-          breaking: ${{ github.event_name == 'pull_request' }}
-          breaking_against: https://github.com/${{ github.repository }}.git#branch=${{ github.base_ref }}
+          # This was PR-only until 2026-09-05, because the commit that first introduced
+          # the proto had no baseline: HEAD~1 was a tree with no .proto files and buf
+          # reported `Module "path: "."" had no .proto files`, which reads as a broken
+          # config rather than as "there is no baseline yet". That window closed the
+          # moment the proto landed on master. With PRs suspended (ADR-0012, amended
+          # 2026-09-05) a PR-only gate would never fire at all — and a contract check
+          # that never runs is worse than none, because it still looks like coverage.
+          #
+          # The push baseline is the local clone (`fetch-depth: 0` above is what makes
+          # HEAD~1 resolvable); on a merge commit HEAD~1 is the first parent, i.e. the
+          # previous state of master, which is exactly the comparison wanted.
+          breaking: true
+          breaking_against: ${{ github.event_name == 'pull_request' && format('https://github.com/{0}.git#branch={1}', github.repository, github.base_ref) || '.git#ref=HEAD~1' }}
           push: false
           archive: false
