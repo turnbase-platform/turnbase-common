@@ -1,8 +1,8 @@
 # Build and contract checks for turnbase-common.
 #
-# IMP-M0-01 requires buf lint and buf breaking to run in CI. IMP-M0-11 owns the rest of
-# the pipeline for all five repositories — publish, container scan, release on tag — and
-# extends this file rather than replacing it.
+# IMP-M0-01 requires buf lint and buf breaking to run in CI. IMP-M0-11 (this file's Trivy
+# step, and publish.yml alongside it) owns the rest of the pipeline for all five
+# repositories — dependency scanning and release on tag.
 #
 # master everywhere, never main (conventions.md §4).
 name: build
@@ -50,6 +50,25 @@ jobs:
           name: jacoco
           path: target/site/jacoco/
           if-no-files-found: warn
+
+      - name: Trivy scan — dependencies (report)
+        # platform-operations.md FR-CICD-010: every finding is reported; only a critical one
+        # blocks the build (the next step), because a pipeline that blocks on every advisory
+        # stops being run.
+        uses: aquasecurity/trivy-action@0.33.1
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: 'LOW,MEDIUM,HIGH,CRITICAL'
+          exit-code: '0'
+
+      - name: Trivy scan — dependencies (gate)
+        uses: aquasecurity/trivy-action@0.33.1
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: CRITICAL
+          exit-code: '1'
 
   contract:
     runs-on: ubuntu-latest

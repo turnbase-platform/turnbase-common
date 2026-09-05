@@ -1,0 +1,59 @@
+# Release publish for turnbase-common — IMP-M0-11.
+#
+# Triggers ONLY on a v*.*.* tag pushed to master, never on an ordinary push (that is
+# build.yml's job). Cutting the tag is a human action (CLAUDE.md, ADR-0012 — the tag is the
+# release trigger); this workflow is what runs once someone does.
+name: publish
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up GraalVM CE 21
+        uses: graalvm/setup-graalvm@v1
+        with:
+          distribution: graalvm-community
+          java-version: '21'
+          cache: maven
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set release version from the tag
+        # ADR-0012 Release Strategy: "CI sets the version from the tag." v1.2.3 -> 1.2.3.
+        run: ./mvnw --batch-mode versions:set -DnewVersion="${GITHUB_REF_NAME#v}" -DgenerateBackupPoms=false
+
+      - name: Verify
+        # Same gate as an ordinary push — a release is not exempt from Spotless, Error
+        # Prone/NullAway, buf, or the coverage floor.
+        run: ./mvnw --batch-mode --no-transfer-progress verify
+
+      - name: Configure GitHub Packages credentials
+        # GITHUB_TOKEN is scoped to this repository and already has packages:write from the
+        # `permissions:` block above — no separate secret to provision.
+        run: |
+          mkdir -p ~/.m2
+          cat > ~/.m2/settings.xml <<XML
+          <settings>
+            <servers>
+              <server>
+                <id>github</id>
+                <username>${{ github.actor }}</username>
+                <password>${{ secrets.GITHUB_TOKEN }}</password>
+              </server>
+            </servers>
+          </settings>
+          XML
+
+      - name: Publish to GitHub Packages
+        # -Prelease attaches the Javadoc jar (pom.xml); sources are attached unconditionally.
+        run: ./mvnw --batch-mode --no-transfer-progress -Prelease deploy -DskipTests

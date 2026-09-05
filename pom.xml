@@ -20,6 +20,21 @@
     contract, plus internal models. Not a public contract — that is turnbase-sdk.</description>
 
   <!--
+    GitHub Packages (ADR-0012 Release Strategy: "Manual tag; CI publishes to GitHub Packages").
+    This repo is internal-only (turnbase-sdk is the public artifact), so the packages registry
+    tied to this same private GitHub org is the right target — no external account to
+    provision, unlike turnbase-sdk's Maven Central. `publish.yml` (IMP-M0-11) is the only
+    workflow that ever reaches this: it triggers on a v*.*.* tag, never on an ordinary push.
+  -->
+  <distributionManagement>
+    <repository>
+      <id>github</id>
+      <name>TurnBase turnbase-common GitHub Packages</name>
+      <url>https://maven.pkg.github.com/turnbase-platform/turnbase-common</url>
+    </repository>
+  </distributionManagement>
+
+  <!--
     Every version below is exact. conventions.md §6 requires reproducible builds, and a
     range or a property inherited from elsewhere is how the same commit compiles
     differently on Tuesday.
