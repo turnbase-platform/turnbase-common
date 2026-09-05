@@ -55,18 +55,20 @@ jobs:
         # platform-operations.md FR-CICD-010: every finding is reported; only a critical one
         # blocks the build (the next step), because a pipeline that blocks on every advisory
         # stops being run.
-        uses: aquasecurity/trivy-action@0.33.1
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: fs
           scan-ref: .
+          scanners: vuln
           severity: 'LOW,MEDIUM,HIGH,CRITICAL'
           exit-code: '0'
 
       - name: Trivy scan — dependencies (gate)
-        uses: aquasecurity/trivy-action@0.33.1
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: fs
           scan-ref: .
+          scanners: vuln
           severity: CRITICAL
           exit-code: '1'
 
