@@ -163,7 +163,7 @@ message CreateSessionRequest {
   bytes parameters = 4;
 
   // FQCN of the class implementing TurnBaseGame, resolved by the Orchestration
-  // Service from the manifest's backend.entryPoint (manifest-schema.md
+  // Service from the manifest's backend.entryPoint (game-development-experience.md
   // FR-MANIFEST-008) — the same manifest read that materializes `parameters`
   // above. Platform-known, not opaque. The guest bridge classloads and
   // instantiates it (game-host-internals.md §3.2/§6.2/§7.2); IMP-GATE-79 added
