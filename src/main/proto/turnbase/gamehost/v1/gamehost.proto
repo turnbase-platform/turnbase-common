@@ -161,6 +161,15 @@ message CreateSessionRequest {
   // game-defined action/effect/state payloads. (FR-IN-002, FR-MANIFEST-005,
   // review GAME-I5; see game-host-internals.md §3.4.)
   bytes parameters = 4;
+
+  // FQCN of the class implementing TurnBaseGame, resolved by the Orchestration
+  // Service from the manifest's backend.entryPoint (manifest-schema.md
+  // FR-MANIFEST-008) — the same manifest read that materializes `parameters`
+  // above. Platform-known, not opaque. The guest bridge classloads and
+  // instantiates it (game-host-internals.md §3.2/§6.2/§7.2); IMP-GATE-79 added
+  // this field because no prior version of this message told the bridge which
+  // class to load.
+  string entry_point_fqcn = 5;
 }
 
 message ProcessInputRequest {
