@@ -454,6 +454,10 @@ message HeartbeatRequest {
   uint32 active_sessions = 2;
   uint32 active_contexts = 3;
   uint32 memory_used_percent = 4;
+  // True once the instance has begun its own scale-in drain (SIGTERM): the Orchestration
+  // Service stops selecting it for new sessions, as if it had pushed drain=true itself
+  // (FR-SCALE-006, load-testing-phase-b.md 5.3).
+  bool draining = 5;
 }
 
 message HeartbeatResponse {
