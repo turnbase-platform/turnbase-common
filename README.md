@@ -65,3 +65,13 @@ place for it to surface, but only if `buf breaking` said it was breaking first.
 
 Order when the proto changes: **this repo merges and tags → CI publishes → each consumer bumps
 `<turnbase-common.version>` in its own PR.** There is no atomic multi-repo commit.
+
+## Third-party licences
+
+What this repository distributes is audited for its dependencies' licences (allowed families:
+`docs/implementation/conventions.md` §6 *Third-party licences*). The report is generated, not committed:
+
+```bash
+./mvnw org.codehaus.mojo:license-maven-plugin:2.8.0:add-third-party -Dlicense.excludedScopes=test,provided
+# -> target/generated-sources/license/THIRD-PARTY.txt
+```
