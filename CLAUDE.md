@@ -1,7 +1,7 @@
 # turnbase-common — CLAUDE.md
 
 Internal shared library: generated gRPC stubs and internal models. Publishes
-`io.turnbase:turnbase-grpc`, consumed by `turnbase-platform` (client) and `turnbase-game-host`
+`io.github.turnbase-platform:turnbase-grpc`, consumed by `turnbase-platform` (client) and `turnbase-game-host`
 (server).
 
 **This file is additive** — corpus, registry and conventions live in the parent repository:

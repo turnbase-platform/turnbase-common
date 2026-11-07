@@ -1,7 +1,7 @@
 # turnbase-common
 
 Internal shared library for TurnBase: generated gRPC stubs for the Orchestration Service ↔ Game Host
-contract, plus internal models. Published as `io.turnbase:turnbase-grpc`.
+contract, plus internal models. Published as `io.github.turnbase-platform:turnbase-grpc`.
 
 **This is not a public contract.** The public Game Development Kit is
 [`turnbase-sdk`](https://github.com/turnbase-platform/turnbase-sdk). Nothing outside
