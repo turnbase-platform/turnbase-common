@@ -1,22 +1,31 @@
-# Release publish for turnbase-common — IMP-M0-11.
+# Release publish for turnbase-common — IMP-M0-11, rewritten by IMP-M21-05 (ADR-0022).
 #
-# Triggers ONLY on a v*.*.* tag pushed to master, never on an ordinary push (that is
-# build.yml's job). Cutting the tag is a human action (CLAUDE.md, ADR-0012 — the tag is the
-# release trigger); this workflow is what runs once someone does.
+# A v*.*.* tag (cut by the owner, ADR-0012) deploys the jars into the Maven tree of this
+# repository's gh-pages branch (https://turnbase-platform.github.io/turnbase-common/maven/).
+# workflow_dispatch with dry-run (default true) deploys into a workflow-local directory and
+# proves the layout instead; Pages itself is not exercised before the flip (IMP-M21-10).
+# Only the workflow's own GITHUB_TOKEN is used — no secret.
 name: publish
 
 on:
   push:
     tags:
       - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: 'Deploy into a workflow-local directory and verify the layout; publish nothing'
+        type: boolean
+        default: true
 
 permissions:
-  contents: read
-  packages: write
+  contents: write
 
 jobs:
   publish:
     runs-on: ubuntu-latest
+    env:
+      DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry-run }}
     steps:
       - uses: actions/checkout@v7
 
@@ -28,32 +37,43 @@ jobs:
           cache: maven
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Set release version from the tag
-        # ADR-0012 Release Strategy: "CI sets the version from the tag." v1.2.3 -> 1.2.3.
-        run: ./mvnw --batch-mode versions:set -DnewVersion="${GITHUB_REF_NAME#v}" -DgenerateBackupPoms=false
+      - name: Set release version
+        # ADR-0012: CI sets the version from the tag (v1.2.3 -> 1.2.3). A dry run has no tag.
+        run: |
+          if [[ "$GITHUB_REF_TYPE" == tag ]]; then v="${GITHUB_REF_NAME#v}"; else v=0.0.0-dryrun; fi
+          echo "VERSION=$v" >> "$GITHUB_ENV"
+          ./mvnw --batch-mode versions:set -DnewVersion="$v" -DgenerateBackupPoms=false
 
       - name: Verify
-        # Same gate as an ordinary push — a release is not exempt from Spotless, Error
-        # Prone/NullAway, buf, or the coverage floor.
+        # A release is not exempt from Spotless, Error Prone/NullAway, buf or the coverage floor.
         run: ./mvnw --batch-mode --no-transfer-progress verify
 
-      - name: Configure GitHub Packages credentials
-        # GITHUB_TOKEN is scoped to this repository and already has packages:write from the
-        # `permissions:` block above — no separate secret to provision.
+      - name: Prepare the Maven tree
         run: |
-          mkdir -p ~/.m2
-          cat > ~/.m2/settings.xml <<XML
-          <settings>
-            <servers>
-              <server>
-                <id>github</id>
-                <username>${{ github.actor }}</username>
-                <password>${{ secrets.GITHUB_TOKEN }}</password>
-              </server>
-            </servers>
-          </settings>
-          XML
+          if [[ "$DRY_RUN" == true ]]; then
+            mkdir -p "$RUNNER_TEMP/site"
+          else
+            git fetch origin gh-pages:gh-pages 2>/dev/null || git branch gh-pages "$(git commit-tree "$(git hash-object -t tree /dev/null)" -m init)"
+            git worktree add "$RUNNER_TEMP/site" gh-pages
+          fi
+          mkdir -p "$RUNNER_TEMP/site/maven"
 
-      - name: Publish to GitHub Packages
-        # -Prelease attaches the Javadoc jar (pom.xml); sources are attached unconditionally.
-        run: ./mvnw --batch-mode --no-transfer-progress -Prelease deploy -DskipTests
+      - name: Deploy into the tree
+        # -Prelease attaches the Javadoc jar; sources are attached unconditionally.
+        run: >
+          ./mvnw --batch-mode --no-transfer-progress -Prelease deploy -DskipTests
+          -DaltDeploymentRepository="local::file://$RUNNER_TEMP/site/maven"
+
+      - name: Prove the layout
+        run: scripts/verify-maven-layout.sh "$RUNNER_TEMP/site/maven" "$VERSION" turnbase-grpc
+
+      - name: Publish to gh-pages
+        if: env.DRY_RUN != 'true'
+        working-directory: ${{ runner.temp }}/site
+        run: |
+          touch .nojekyll
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "release ${GITHUB_REF_NAME}"
+          git push origin HEAD:gh-pages
