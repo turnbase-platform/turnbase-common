@@ -1,5 +1,7 @@
 # turnbase-common
 
+> Part of [TurnBase](https://github.com/turnbase-platform/turnbase), a platform for turn-based multiplayer games — this is the internal gRPC contract between the platform and the Game Host. Start at the [umbrella README](https://github.com/turnbase-platform/turnbase#readme).
+
 Internal shared library for TurnBase: generated gRPC stubs for the Orchestration Service ↔ Game Host
 contract, plus internal models. Published as `io.github.turnbase-platform:turnbase-grpc`.
 
@@ -51,7 +53,7 @@ from the same file, so nothing else would notice.
 
 - **Almost everything here is generated.** NullAway is scoped to `io.turnbase.grpc.internal` — the
   hand-written package — and the stubs are excluded. Noise on code nobody wrote is the fastest route
-  to somebody muting the tool in all five repositories ([ADR-0015](../docs/decisions/0015-static-analysis-error-prone-nullaway.md)).
+  to somebody muting the tool in all five repositories ([ADR-0015](https://github.com/turnbase-platform/turnbase/blob/master/docs/decisions/0015-static-analysis-error-prone-nullaway.md)).
 - **The coverage gate is currently inert**, and deliberately so: it measures the hand-written
   remainder, which is empty, so JaCoCo reports success over a bundle of zero classes. It becomes
   load-bearing on its own the moment a class lands under `io.turnbase.grpc.internal`. Do not lower
@@ -75,3 +77,11 @@ What this repository distributes is audited for its dependencies' licences (allo
 ./mvnw org.codehaus.mojo:license-maven-plugin:2.8.0:add-third-party -Dlicense.excludedScopes=test,provided
 # -> target/generated-sources/license/THIRD-PARTY.txt
 ```
+
+## Layout
+
+See the umbrella's [`ARCHITECTURE.md`](https://github.com/turnbase-platform/turnbase/blob/master/ARCHITECTURE.md).
+
+## Licence
+
+Apache-2.0, see [`LICENSE`](LICENSE).
