@@ -19,6 +19,14 @@
   <description>Internal shared library: generated gRPC stubs for the Orchestration Service to Game Host
     contract, plus internal models. Not a public contract — that is turnbase-sdk.</description>
 
+  <licenses>
+    <license>
+      <name>Apache-2.0</name>
+      <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+      <distribution>repo</distribution>
+    </license>
+  </licenses>
+
   <!--
     GitHub Packages (ADR-0012 Release Strategy: "Manual tag; CI publishes to GitHub Packages").
     This repo is internal-only (turnbase-sdk is the public artifact), so the packages registry
